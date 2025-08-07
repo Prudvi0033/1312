@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String  @id @default(uuid())
+  username String
+  email    String  @unique
+  avatar   String?
+  about    String?
+  website  String?
+  location String?
+
+  createdAt DateTime @default(now())
+
+  //relations
+  questions Question[]
+  comments  Comment[]
+  votes     Vote[]
+
+  following Follow[] @relation("UserFollowing")
+  followers Follow[] @relation("UserFollowers")
+
+  notifications     Notification[] @relation("NotificationUser")
+  sendNotifications Notification[] @relation("NotificationSender")
+}
+
+model Question {
+  id      String  @id @default(uuid())
+  content String
+  views   Int     @default(0)
+  slug    String? @unique
+
+  createdAt DateTime @default(now())
+
+  //relations
+  comments Comment[]
+  votes    Vote[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id      String @id @default(uuid())
+  content String
+  count   Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  //relations
+  userId     String
+  questionId String
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  votes Vote[]
+}
+
+model Vote {
+  id   String   @id @default(uuid())
+  type VoteType
+
+  createdAt DateTime @default(now())
+
+  //relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Polymorphic relation - vote can be on question or comment
+  questionId String?
+  question   Question? @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  commentId  String?
+  comment    Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  // Ensure user can only vote once per question or comment
+  @@unique([userId, questionId])
+  @@unique([userId, commentId])
+}
+
+model Follow {
+  id String @id @default(uuid())
+
+  createdAt DateTime @default(now())
+
+  //relations
+  followerId  String
+  follower    User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+
+  followingId String
+  following   User   @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+model Notification {
+  id     String           @id @default(uuid())
+  type   NotificationType
+  isRead Boolean
+
+  createdAt DateTime @default(now())
+
+  //relations
+  userId String
+  user   User   @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  senderId String?
+  sender   User?   @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+}
+
+enum VoteType {
+  Upvote
+  DownVote
+}
+
+enum NotificationType {
+  Like
+  Comment
+  Follow
+}
